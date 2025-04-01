@@ -8,9 +8,9 @@
 </head>
 <body>
     <!-- Header con botón para regresar -->
-<nav class="navbar navbar-expand-lg navbar-light bg-light mb-4">
+<nav class="navbar navbar-expand-lg navbar-dark bg-light mb-4">
     <a class="navbar-brand" href="/">
-        <button class="btn btn-outline-secondary">
+        <button class="btn btn-outline-primary">
             <i class="fas fa-arrow-left"></i> Administrar Empleados
         </button>
     </a>
@@ -54,6 +54,8 @@
                     <label>Bono:</label>
                     <input type="number" step="0.01" class="form-control" id="bono" name="bono" placeholder="Ingrese bono opcional">
                 </div>
+                <button type="button" class="btn btn-success btn-sm" onclick="agregarPercepcion()">+ Agregar Percepción</button>
+
             </div>
             <hr>
             <h3>Deducciones</h3>
@@ -82,6 +84,8 @@
                     <label>Caja de Ahorro (6%):</label>
                     <input type="number" step="0.01" class="form-control" id="caja_ahorro" name="caja_ahorro" readonly>
                 </div>
+                <button type="button" class="btn btn-danger btn-sm" onclick="agregarDeduccion()">+ Agregar Deducción</button>
+
             </div>
             <hr>
             <button type="submit" class="btn btn-primary btn-block">Generar Nómina</button>

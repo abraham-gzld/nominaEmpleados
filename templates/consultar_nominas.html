@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administrar Empleados</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/consultar_nominas.css') }}">
+    <script src="{{ url_for('static', filename='js/consulta_nomina.js') }}"></script>
+</head>
+<body>
+<!-- Header con botón para regresar -->
+<nav class="navbar navbar-expand-lg navbar-light bg-light mb-4">
+    <a class="navbar-brand" href="/">
+        <button class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Pagina Principal
+        </button>
+    </a>
+</nav>
+
+<div class="container mt-5">
+    <h1>Consulta de Nóminas</h1>
+    <table class="table table-striped table-bordered">
+        <thead>
+            <tr>
+                <th>ID Nómina</th>
+                <th>Empleado</th>
+                <th>Fecha de Emisión</th>
+                <th>Periodo</th>
+                <th>Total Percepciones</th>
+                <th>Total Deducciones</th>
+                <th>Total Neto</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for nomina in nominas %}
+            <tr>
+                <td class="text-center">{{ nomina[0] }}</td>
+                <td>{{ nomina[1] }} {{ nomina[2] }}</td>
+                <td class="text-center">{{ nomina[3] }}</td>
+                <td class="text-center">{{ nomina[4] }} al {{ nomina[5] }}</td>
+                <td class="text-right">${{ nomina[6] }}</td>
+                <td class="text-right">${{ nomina[7] }}</td>
+                <td class="text-right"><strong>${{ nomina[8] }}</strong></td>
+                <td class="text-center">
+                    <button class="btn btn-info btn-sm" onclick="verDetalle('{{ nomina[0] }}')">Ver Detalle</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+<!-- Modal de Detalle de Nómina -->
+<div class="modal fade" id="detalleNominaModal" tabindex="-1" role="dialog" aria-labelledby="detalleNominaModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="detalleNominaModalLabel">Detalle de la Nómina</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <p><strong>Empleado:</strong> <span id="empleadoNombre"></span></p>
+          <p><strong>Fecha de Emisión:</strong> <span id="fechaEmision"></span></p>
+          <p><strong>Periodo:</strong> <span id="periodo"></span></p>
+          <p><strong>Total Percepciones:</strong> $<span id="totalPercepciones"></span></p>
+          <p><strong>Total Deducciones:</strong> $<span id="totalDeducciones"></span></p>
+          <p><strong>Total Neto:</strong> $<span id="totalNeto"></span></p>
+  
+          <h6>Percepciones:</h6>
+          <ul id="listaPercepciones"></ul>
+  
+          <h6>Deducciones:</h6>
+          <ul id="listaDeducciones"></ul>
+  
+          <h6>Incapacidades:</h6>
+          <ul id="listaIncapacidades"></ul>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
+          <button type="button" class="btn btn-primary" onclick="descargarPDF()">Descargar PDF</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+
+
+
+<!-- Scripts de jQuery y Bootstrap -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script> <!-- jQuery 3.6.0 -->
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script> <!-- Bootstrap 4.5.2 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script> <!-- jsPDF -->
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.3/dist/umd/popper.min.js"></script> <!-- Popper.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.13/jspdf.plugin.autotable.min.js"></script>
+
+</body>
+</html>

@@ -44,3 +44,13 @@ CREATE TABLE deducciones (
     monto DECIMAL(10,2) NOT NULL,
     FOREIGN KEY (id_nomina) REFERENCES nominas(id_nomina) ON DELETE CASCADE
 );
+
+CREATE TABLE incapacidades (
+    id_incapacidad INT AUTO_INCREMENT PRIMARY KEY,
+    id_empleado INT NOT NULL,
+    fecha_inicio DATE NOT NULL,
+    fecha_fin DATE NOT NULL,
+    dias_incapacidad INT NOT NULL,
+    tipo VARCHAR(20) NOT NULL, -- Ej: "Enfermedad", "Maternidad", etc.
+    FOREIGN KEY (id_empleado) REFERENCES empleados(id_empleado) ON DELETE CASCADE
+);
