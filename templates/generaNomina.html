@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generar Nómina</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+</head>
+<body>
+    <!-- Header con botón para regresar -->
+<nav class="navbar navbar-expand-lg navbar-light bg-light mb-4">
+    <a class="navbar-brand" href="/">
+        <button class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Administrar Empleados
+        </button>
+    </a>
+</nav>
+    <div class="container mt-5">
+        <h1 class="text-center">Generar Nómina</h1>
+        <form id="formNomina" action="/generar_nomina" method="POST">
+            <div class="form-group">
+                <label for="empleado">Seleccionar Empleado:</label>
+                <select class="form-control" id="empleado" name="empleado" required onchange="cargarPercepcionesYDeducciones()">
+                    <option value="">-- Seleccione un empleado --</option>
+                    {% for empleado in empleados %}
+                        <option value="{{ empleado[0] }}" data-salario="{{ empleado[1] }}">{{ empleado[2] }} {{ empleado[3] }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="periodo_inicio">Periodo Inicio:</label>
+                <input type="date" class="form-control" id="periodo_inicio" name="periodo_inicio" required>
+            </div>
+            <div class="form-group">
+                <label for="periodo_fin">Periodo Fin:</label>
+                <input type="date" class="form-control" id="periodo_fin" name="periodo_fin" required>
+            </div>
+            <hr>
+            <h3>Percepciones</h3>
+            <div id="percepciones">
+                <div class="form-group">
+                    <label>Sueldo Base:</label>
+                    <input type="number" step="0.01" class="form-control" id="salario_base" name="salario_base" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Puntualidad (5%):</label>
+                    <input type="number" step="0.01" class="form-control" id="puntualidad" name="puntualidad" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Asistencia (3%):</label>
+                    <input type="number" step="0.01" class="form-control" id="asistencia" name="asistencia" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Bono:</label>
+                    <input type="number" step="0.01" class="form-control" id="bono" name="bono" placeholder="Ingrese bono opcional">
+                </div>
+            </div>
+            <hr>
+            <h3>Deducciones</h3>
+            <div id="deducciones">
+                <div class="form-group">
+                    <label>IMSS (8.5%):</label>
+                    <input type="number" step="0.01" class="form-control" id="imss" name="imss" readonly>
+                </div>
+                <div class="form-group">
+                    <label>ISR (10%):</label>
+                    <input type="number" step="0.01" class="form-control" id="isr" name="isr" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Cuota Sindical (3%):</label>
+                    <input type="number" step="0.01" class="form-control" id="cuota_sindical" name="cuota_sindical" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Fondo Retiro (3%):</label>
+                    <input type="number" step="0.01" class="form-control" id="fondo_retiro" name="fondo_retiro" readonly>
+                </div>
+                <div class="form-group">
+                    <label>INFONAVIT (30%):</label>
+                    <input type="number" step="0.01" class="form-control" id="infonavit" name="infonavit" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Caja de Ahorro (6%):</label>
+                    <input type="number" step="0.01" class="form-control" id="caja_ahorro" name="caja_ahorro" readonly>
+                </div>
+            </div>
+            <hr>
+            <button type="submit" class="btn btn-primary btn-block">Generar Nómina</button>
+        </form>
+    </div>
+    <script src="{{ url_for('static', filename='js/genera_nomina.js') }}"></script>
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+</html>

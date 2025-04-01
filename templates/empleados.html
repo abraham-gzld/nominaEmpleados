@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administrar Empleados</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+   
+
+</head>
+<body>
+<!-- Header con botón para regresar -->
+<nav class="navbar navbar-expand-lg navbar-light bg-light mb-4">
+    <a class="navbar-brand" href="/">
+        <button class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Administrar Empleados
+        </button>
+    </a>
+</nav>
+
+<div class="container mt-5">
+    <h1 class="text-center mb-4">Administrar Empleados</h1>
+    <div class="row justify-content-end mb-3">
+        <div class="col-md-3">
+            <a href="#" class="btn btn-success btn-block" data-toggle="modal" data-target="#addEmployeeModal">Agregar Empleado</a>
+        </div>
+    </div>
+    
+    <!-- Tabla de Empleados -->
+    <table class="table table-bordered">
+        <thead class="thead-dark">
+            <tr>
+                <th>#</th>
+                <th>Nombre</th>
+                <th>Curp</th>
+                <th>RFC</th>
+                <th>NSS</th>
+                <th>Puesto</th>
+                <th>Departamento</th>
+                <th>Sueldo</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for empleado in empleados %}
+                <tr>
+                    <td>{{ empleado[0] }}</td>  <!-- id_empleado -->
+                    <td>{{ empleado[1] }} {{ empleado[2] }}</td>  <!-- nombre y apellido -->
+                    <td>{{empleado[3]}}</td>
+                    <td>{{empleado[4]}}</td>
+                    <td>{{empleado[5]}}</td>
+                    <td>{{ empleado[6] }}</td>  <!-- puesto -->
+                    <td>{{ empleado[7] }}</td>  <!-- departamento -->
+                    <td>{{ empleado[8] }}</td>
+                    <td>
+                        <button class="btn btn-warning btn-sm" data-toggle="modal" data-target="#editEmployeeModal"
+                          data-id="{{ empleado[0] }}" data-nombre="{{ empleado[1] }}" data-apellido="{{ empleado[2] }}"
+                          data-curp="{{ empleado[3] }}" data-rfc="{{ empleado[4] }}" data-nss="{{ empleado[5] }}"
+                          data-puesto="{{ empleado[6] }}" data-departamento="{{ empleado[7] }}" data-salario="{{ empleado[8] }}">
+                          Editar
+                        </button>
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Modal para Agregar Empleado -->
+<div class="modal fade" id="addEmployeeModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="exampleModalLabel">Agregar Nuevo Empleado</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <form action="/agregar_empleado" method="POST">
+              <div class="form-group">
+                  <label for="nombre">Nombre</label>
+                  <input type="text" class="form-control" id="nombre" name="nombre" required>
+              </div>
+              <div class="form-group">
+                  <label for="apellido">Apellido</label>
+                  <input type="text" class="form-control" id="apellido" name="apellido" required>
+              </div>
+              <div class="form-group">
+                  <label for="curp">CURP</label>
+                  <input type="text" class="form-control" id="curp" name="curp" required>
+              </div>
+              <div class="form-group">
+                  <label for="rfc">RFC</label>
+                  <input type="text" class="form-control" id="rfc" name="rfc" required>
+              </div>
+              <div class="form-group">
+                  <label for="nss">Número de Seguro Social</label>
+                  <input type="text" class="form-control" id="nss" name="nss" required>
+              </div>
+              <div class="form-group">
+                  <label for="puesto">Puesto</label>
+                  <input type="text" class="form-control" id="puesto" name="puesto" required>
+              </div>
+              <div class="form-group">
+                  <label for="departamento">Departamento</label>
+                  <input type="text" class="form-control" id="departamento" name="departamento" required>
+              </div>
+              <div class="form-group">
+                  <label for="salario_base">Salario Base</label>
+                  <input type="number" step="0.01" class="form-control" id="salario_base" name="salario_base" required>
+              </div>
+              <button type="submit" class="btn btn-primary btn-block">Guardar Empleado</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- Modal para Editar Empleado -->
+<div class="modal fade" id="editEmployeeModal" tabindex="-1" role="dialog" aria-labelledby="editEmployeeModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="editEmployeeModalLabel">Editar Empleado</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <form action="/editar_empleado" method="POST">
+              <input type="hidden" id="edit_id_empleado" name="id_empleado">
+              <div class="form-group">
+                  <label for="edit_nombre">Nombre</label>
+                  <input type="text" class="form-control" id="edit_nombre" name="nombre" required>
+              </div>
+              <div class="form-group">
+                  <label for="edit_apellido">Apellido</label>
+                  <input type="text" class="form-control" id="edit_apellido" name="apellido" required>
+              </div>
+              <div class="form-group">
+                  <label for="edit_curp">CURP</label>
+                  <input type="text" class="form-control" id="edit_curp" name="curp" required>
+              </div>
+              <div class="form-group">
+                  <label for="edit_rfc">RFC</label>
+                  <input type="text" class="form-control" id="edit_rfc" name="rfc" required>
+              </div>
+              <div class="form-group">
+                  <label for="edit_nss">Número de Seguro Social</label>
+                  <input type="text" class="form-control" id="edit_nss" name="nss" required>
+              </div>
+              <div class="form-group">
+                  <label for="edit_puesto">Puesto</label>
+                  <input type="text" class="form-control" id="edit_puesto" name="puesto" required>
+              </div>
+              <div class="form-group">
+                  <label for="edit_departamento">Departamento</label>
+                  <input type="text" class="form-control" id="edit_departamento" name="departamento" required>
+              </div>
+              <div class="form-group">
+                  <label for="edit_salario_base">Salario Base</label>
+                  <input type="number" step="0.01" class="form-control" id="edit_salario_base" name="salario_base" required>
+              </div>
+              <button type="submit" class="btn btn-primary btn-block">Guardar Cambios</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+<!-- Scripts de Bootstrap -->
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.3/dist/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+<script src="{{ url_for('static', filename='js/edit_empleado.js') }}"></script>
+</body>
+</html>
