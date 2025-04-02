@@ -13,6 +13,7 @@ function verDetalle(idNomina) {
 
         // Llenar el modal con los datos de la nómina
         $('#empleadoNombre').text(data.empleado.nombre + ' ' + data.empleado.apellido);
+        $('#empleadoPuesto').text(data.empleado.puesto); // Mostrar el puesto
         $('#fechaEmision').text(data.fecha_emision);
         $('#periodo').text(data.periodo_inicio + ' al ' + data.periodo_fin);
         $('#totalPercepciones').text(data.total_percepciones);

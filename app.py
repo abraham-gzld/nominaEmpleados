@@ -204,16 +204,12 @@ def obtener_nomina_por_id(id_nomina):
 def detalle_nomina(id_nomina):
     # Obtener los detalles de la nómina y el empleado
     nomina = obtener_detalle_nomina(id_nomina)
+    
     if nomina:
-        # Asegúrate de incluir la información del empleado
-        empleado = obtener_nomina_por_id(nomina['id_nomina'])  # O lo que sea necesario
-        nomina['empleado'] = {
-            'nombre': empleado['nombre'],
-            'apellido': empleado['apellido']
-        }
-        return jsonify(nomina)
+        return jsonify(nomina)  # No sobrescribas nomina['empleado']
     else:
         return jsonify({'error': 'No se encontró la nómina'}), 404
+
 
 
 def obtener_detalle_nomina(id_nomina):
