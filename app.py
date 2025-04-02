@@ -268,7 +268,7 @@ def obtener_detalle_nomina(id_nomina):
         return None
 
 @app.route('/configuracion')
-def configuracion():
+def configudracion():
     return render_template('index.html')
 
     
