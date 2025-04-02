@@ -267,17 +267,12 @@ def obtener_detalle_nomina(id_nomina):
     else:
         return None
 
-@app.route('/configuracion')
-def configudracion():
+@app.route('/configudracion')
+def configuracion():
     return render_template('index.html')
+
 
     
 app.run(debug=True)
-
-
-@app.route('/configuracion')
-def configuracion():
-    return "Configuración"
-
 if __name__ == '__main__':
     app.run(debug=True)
