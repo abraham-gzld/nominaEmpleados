@@ -25,3 +25,4 @@ function cargarPercepcionesYDeducciones() {
     document.getElementById("infonavit").value = (salarioBase * 0.30).toFixed(2);
     document.getElementById("caja_ahorro").value = (salarioBase * 0.06).toFixed(2);
 }
+

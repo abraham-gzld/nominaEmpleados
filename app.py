@@ -1,9 +1,12 @@
 from flask import Flask, jsonify, redirect, render_template, request, url_for
 from backend.conexionBD import obtener_conexion
+from datetime import datetime
+from werkzeug.utils import secure_filename
+import os
 app = Flask(__name__)
 
 @app.route('/')
-def home():
+def index():
     return render_template('index.html')
 
 @app.route('/empleados')
@@ -75,6 +78,55 @@ def editar_empleado():
 
         # Redirigir de vuelta a la página de empleados
         return redirect(url_for('empleados'))
+    
+UPLOAD_FOLDER = 'static/uploads'
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+@app.route('/agregar_incapacidad', methods=['GET', 'POST'])
+def agregar_incapacidad():
+    conexion = obtener_conexion()
+    cursor = conexion.cursor()
+
+    # Obtener lista de empleados
+    cursor.execute("SELECT id_empleado, nombre FROM empleados")
+    empleados = cursor.fetchall()
+
+    if request.method == 'POST':
+        id_empleado = request.form['id_empleado']
+        fecha_inicio = datetime.strptime(request.form['fecha_inicio'], '%Y-%m-%d')
+        fecha_fin = datetime.strptime(request.form['fecha_fin'], '%Y-%m-%d')
+        tipo = request.form['tipo']
+        dias_incapacidad = (fecha_fin - fecha_inicio).days + 1
+        imagen_filename = None  # Por si no se sube imagen
+
+        # Manejo de la imagen
+        if 'imagen' in request.files:
+            imagen = request.files['imagen']
+            if imagen and allowed_file(imagen.filename):
+                filename = secure_filename(imagen.filename)
+                imagen_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                imagen.save(imagen_path)
+                imagen_filename = f"uploads/{filename}"  # Guardar ruta relativa
+
+        # Insertar datos en la base de datos
+        cursor.execute("""
+            INSERT INTO incapacidades (id_empleado, fecha_inicio, fecha_fin, dias_incapacidad, tipo, imagen)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (id_empleado, fecha_inicio, fecha_fin, dias_incapacidad, tipo, imagen_filename))
+
+        conexion.commit()
+        cursor.close()
+        conexion.close()
+
+        return redirect(url_for('index'))
+
+    cursor.close()
+    conexion.close()
+    return render_template('agregar_incapacidad.html', empleados=empleados)
 
 @app.route('/nominas')
 def nominas():
@@ -86,7 +138,20 @@ def nominas():
     conexion.close()
     return render_template("generaNomina.html", empleados=empleados)
 
-@app.route("/generar_nomina", methods=["GET", "POST"])
+@app.route("/nominas_por_quincena/<int:quincena>")
+def nominas_por_quincena(quincena):
+    conexion = obtener_conexion()
+    cursor = conexion.cursor(dictionary=True)
+    
+    cursor.execute("SELECT * FROM nominas WHERE quincena = %s", (quincena,))
+    nominas = cursor.fetchall()
+    
+    cursor.close()
+    conexion.close()
+    
+    return render_template("nominas.html", nominas=nominas)
+
+@app.route("/generar_nomina", methods=["POST"])
 def generar_nomina():
     conexion = obtener_conexion()
     cursor = conexion.cursor()
@@ -94,7 +159,8 @@ def generar_nomina():
     id_empleado = request.form['empleado']
     periodo_inicio = request.form['periodo_inicio']
     periodo_fin = request.form['periodo_fin']
-    
+
+
     salario_base = float(request.form['salario_base'])
     puntualidad = float(request.form['puntualidad'])
     asistencia = float(request.form['asistencia'])
@@ -106,15 +172,18 @@ def generar_nomina():
     infonavit = float(request.form['infonavit'])
     caja_ahorro = float(request.form['caja_ahorro'])
 
-    # Guardar nómina en la tabla 'nominas'
+    # Calcular totales
     total_percepciones = salario_base + puntualidad + asistencia
     total_deducciones = imss + isr + cuota_sindical + fondo_retiro + infonavit + caja_ahorro
     total_neto = total_percepciones - total_deducciones
 
-    sql_nomina = "INSERT INTO nominas (id_empleado, fecha_emision, periodo_inicio, periodo_fin, total_percepciones, total_deducciones, total_neto) VALUES (%s, NOW(), %s, %s, %s, %s, %s)"
+    # Insertar en la tabla 'nominas'
+    sql_nomina = """INSERT INTO nominas 
+        (id_empleado, fecha_emision, periodo_inicio, periodo_fin, total_percepciones, total_deducciones, total_neto) 
+        VALUES (%s, NOW(), %s, %s, %s, %s, %s)"""
     cursor.execute(sql_nomina, (id_empleado, periodo_inicio, periodo_fin, total_percepciones, total_deducciones, total_neto))
     conexion.commit()
-    
+
     id_nomina = cursor.lastrowid  # Obtener el ID de la nómina generada
 
     # Guardar percepciones fijas
@@ -123,8 +192,7 @@ def generar_nomina():
         ("Puntualidad", puntualidad),
         ("Asistencia", asistencia)
     ]
-    for concepto, monto in percepciones:
-        cursor.execute("INSERT INTO percepciones (id_nomina, concepto, monto) VALUES (%s, %s, %s)", (id_nomina, concepto, monto))
+    cursor.executemany("INSERT INTO percepciones (id_nomina, concepto, monto) VALUES (%s, %s, %s)", [(id_nomina, c, m) for c, m in percepciones])
 
     # Guardar deducciones fijas
     deducciones = [
@@ -135,8 +203,7 @@ def generar_nomina():
         ("INFONAVIT", infonavit),
         ("Caja de Ahorro", caja_ahorro)
     ]
-    for concepto, monto in deducciones:
-        cursor.execute("INSERT INTO deducciones (id_nomina, concepto, monto) VALUES (%s, %s, %s)", (id_nomina, concepto, monto))
+    cursor.executemany("INSERT INTO deducciones (id_nomina, concepto, monto) VALUES (%s, %s, %s)", [(id_nomina, c, m) for c, m in deducciones])
 
     # Guardar percepciones adicionales agregadas por el usuario
     percepciones_extra = request.form.getlist('percepcion_concepto[]')
@@ -151,7 +218,9 @@ def generar_nomina():
         cursor.execute("INSERT INTO deducciones (id_nomina, concepto, monto) VALUES (%s, %s, %s)", (id_nomina, concepto, float(monto)))
 
     conexion.commit()
-    
+    cursor.close()
+    conexion.close()
+
     return redirect(url_for('nominas'))
 
 @app.route('/consultar_nominas')
@@ -263,9 +332,7 @@ def obtener_detalle_nomina(id_nomina):
     else:
         return None
 
-@app.route('/configudracion')
-def configuracion():
-    return render_template('index.html')
+
 
 
     
