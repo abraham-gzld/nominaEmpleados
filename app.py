@@ -3,6 +3,7 @@ from backend.conexionBD import obtener_conexion
 from datetime import datetime
 from werkzeug.utils import secure_filename
 import os
+from datetime import datetime
 app = Flask(__name__)
 
 @app.route('/')
@@ -157,9 +158,8 @@ def generar_nomina():
     cursor = conexion.cursor()
 
     id_empleado = request.form['empleado']
-    periodo_inicio = request.form['periodo_inicio']
-    periodo_fin = request.form['periodo_fin']
-
+    periodo_inicio = datetime.strptime(request.form['periodo_inicio'], '%Y-%m-%d').date()
+    periodo_fin = datetime.strptime(request.form['periodo_fin'], '%Y-%m-%d').date()
 
     salario_base = float(request.form['salario_base'])
     puntualidad = float(request.form['puntualidad'])
@@ -172,9 +172,52 @@ def generar_nomina():
     infonavit = float(request.form['infonavit'])
     caja_ahorro = float(request.form['caja_ahorro'])
 
-    # Calcular totales
-    total_percepciones = salario_base + puntualidad + asistencia
-    total_deducciones = imss + isr + cuota_sindical + fondo_retiro + infonavit + caja_ahorro
+    # Percepciones adicionales
+    percepciones_extra = request.form.getlist('percepcion_concepto[]')
+    montos_extra = request.form.getlist('percepcion_monto[]')
+    montos_extra_float = [float(m) for m in montos_extra]
+
+    # Deducciones adicionales
+    deducciones_extra = request.form.getlist('deduccion_concepto[]')
+    montos_deducciones_extra = request.form.getlist('deduccion_monto[]')
+    montos_deducciones_extra_float = [float(m) for m in montos_deducciones_extra]
+
+    # Consultar las incapacidades del empleado que caen dentro del período de la nómina
+    cursor.execute("""
+        SELECT fecha_inicio, fecha_fin, dias_incapacidad
+        FROM incapacidades
+        WHERE id_empleado = %s AND fecha_inicio <= %s AND fecha_fin >= %s
+    """, (id_empleado, periodo_fin, periodo_inicio))
+
+    incapacidades = cursor.fetchall()
+
+    # Calcular los días de incapacidad dentro de este período
+    dias_incapacidad_total = 0
+    for fecha_inicio, fecha_fin, dias_incapacidad in incapacidades:
+        # Verificar si las fechas de incapacidad son objetos datetime.date o cadenas
+        if isinstance(fecha_inicio, str):
+            fecha_inicio = datetime.strptime(fecha_inicio, '%Y-%m-%d').date()
+        if isinstance(fecha_fin, str):
+            fecha_fin = datetime.strptime(fecha_fin, '%Y-%m-%d').date()
+
+        # Calcular días de incapacidad en el período de la quincena
+        inicio_incapacidad = max(fecha_inicio, periodo_inicio)
+        fin_incapacidad = min(fecha_fin, periodo_fin)
+
+        # Calcular los días que la incapacidad aplica dentro del período
+        if inicio_incapacidad <= fin_incapacidad:
+            dias_incapacidad_periodo = (fin_incapacidad - inicio_incapacidad).days + 1
+            dias_incapacidad_total += dias_incapacidad_periodo
+
+    # Calcular el sueldo diario
+    sueldo_diario = salario_base / 30  # Suponiendo que el mes tiene 30 días
+
+    # Calcular el descuento por incapacidad
+    descuento_incapacidades = dias_incapacidad_total * sueldo_diario
+
+    # Calcular totales incluyendo adicionales
+    total_percepciones = salario_base + puntualidad + asistencia + sum(montos_extra_float)
+    total_deducciones = imss + isr + cuota_sindical + fondo_retiro + infonavit + caja_ahorro + sum(montos_deducciones_extra_float) + descuento_incapacidades
     total_neto = total_percepciones - total_deducciones
 
     # Insertar en la tabla 'nominas'
@@ -201,19 +244,16 @@ def generar_nomina():
         ("Cuota Sindical", cuota_sindical),
         ("Fondo Retiro", fondo_retiro),
         ("INFONAVIT", infonavit),
-        ("Caja de Ahorro", caja_ahorro)
+        ("Caja de Ahorro", caja_ahorro),
+        ("Incapacidad", descuento_incapacidades)  # Insertar la deducción por incapacidad
     ]
     cursor.executemany("INSERT INTO deducciones (id_nomina, concepto, monto) VALUES (%s, %s, %s)", [(id_nomina, c, m) for c, m in deducciones])
 
     # Guardar percepciones adicionales agregadas por el usuario
-    percepciones_extra = request.form.getlist('percepcion_concepto[]')
-    montos_extra = request.form.getlist('percepcion_monto[]')
     for concepto, monto in zip(percepciones_extra, montos_extra):
         cursor.execute("INSERT INTO percepciones (id_nomina, concepto, monto) VALUES (%s, %s, %s)", (id_nomina, concepto, float(monto)))
 
     # Guardar deducciones adicionales agregadas por el usuario
-    deducciones_extra = request.form.getlist('deduccion_concepto[]')
-    montos_deducciones_extra = request.form.getlist('deduccion_monto[]')
     for concepto, monto in zip(deducciones_extra, montos_deducciones_extra):
         cursor.execute("INSERT INTO deducciones (id_nomina, concepto, monto) VALUES (%s, %s, %s)", (id_nomina, concepto, float(monto)))
 
@@ -223,22 +263,50 @@ def generar_nomina():
 
     return redirect(url_for('nominas'))
 
-@app.route('/consultar_nominas')
+
+@app.route('/consultar_nominas', methods=['GET'])
 def consultar_nominas():
-    conexcion = obtener_conexion()
-    cursor = conexcion.cursor()
-    cursor.execute("""
-        SELECT n.id_nomina, e.nombre, e.apellido, n.fecha_emision, 
-               n.periodo_inicio, n.periodo_fin, n.total_percepciones, 
-               n.total_deducciones, n.total_neto
-        FROM nominas n
-        JOIN empleados e ON n.id_empleado = e.id_empleado
-        ORDER BY n.fecha_emision DESC
-    """)
+    quincena = request.args.get('quincena')  # Obtener el parámetro 'quincena' de la URL
+    conexion = obtener_conexion()
+    cursor = conexion.cursor()
+
+    if quincena == '1':  # Primera Quincena (del 1 al 15)
+        cursor.execute("""
+            SELECT n.id_nomina, e.nombre, e.apellido, n.fecha_emision, 
+                   n.periodo_inicio, n.periodo_fin, n.total_percepciones, 
+                   n.total_deducciones, n.total_neto
+            FROM nominas n
+            JOIN empleados e ON n.id_empleado = e.id_empleado
+            WHERE DAY(n.periodo_inicio) <= 15
+            ORDER BY n.fecha_emision DESC
+        """)
+    elif quincena == '2':  # Segunda Quincena (del 16 al último día del mes)
+        cursor.execute("""
+            SELECT n.id_nomina, e.nombre, e.apellido, n.fecha_emision, 
+                   n.periodo_inicio, n.periodo_fin, n.total_percepciones, 
+                   n.total_deducciones, n.total_neto
+            FROM nominas n
+            JOIN empleados e ON n.id_empleado = e.id_empleado
+            WHERE DAY(n.periodo_inicio) > 15
+            ORDER BY n.fecha_emision DESC
+        """)
+    else:
+        # Si no se especifica ninguna quincena, mostramos todas las nóminas
+        cursor.execute("""
+            SELECT n.id_nomina, e.nombre, e.apellido, n.fecha_emision, 
+                   n.periodo_inicio, n.periodo_fin, n.total_percepciones, 
+                   n.total_deducciones, n.total_neto
+            FROM nominas n
+            JOIN empleados e ON n.id_empleado = e.id_empleado
+            ORDER BY n.fecha_emision DESC
+        """)
+
     nominas = cursor.fetchall()
     cursor.close()
+    conexion.close()
 
-    return render_template("consultar_nominas.html", nominas=nominas)
+    return render_template('consultar_nominas.html', nominas=nominas)
+
 
 
 def obtener_nomina_por_id(id_nomina):
@@ -275,11 +343,14 @@ def detalle_nomina(id_nomina):
     nomina = obtener_detalle_nomina(id_nomina)
     
     if nomina:
-        return jsonify(nomina)  # No sobrescribas nomina['empleado']
+        return jsonify(nomina)  
     else:
         return jsonify({'error': 'No se encontró la nómina'}), 404
 
 
+def filas_a_diccionario(cursor, filas):
+    columnas = [col[0] for col in cursor.description]
+    return [dict(zip(columnas, fila)) for fila in filas]
 
 def obtener_detalle_nomina(id_nomina):
     # Obtener los detalles generales de la nómina
@@ -290,32 +361,36 @@ def obtener_detalle_nomina(id_nomina):
         cursor = conexion.cursor()
 
         # Obtener datos del empleado
-        query_empleado = "SELECT nombre, apellido, puesto FROM empleados WHERE id_empleado = (SELECT id_empleado FROM nominas WHERE id_nomina = %s)"
+        query_empleado = """
+            SELECT nombre, apellido, puesto 
+            FROM empleados 
+            WHERE id_empleado = (SELECT id_empleado FROM nominas WHERE id_nomina = %s)
+        """
         cursor.execute(query_empleado, (id_nomina,))
-        empleado = cursor.fetchone()  # Suponemos que este es un solo resultado
+        empleado = cursor.fetchone()
 
         # Obtener percepciones asociadas a esta nómina
         query_percepciones = "SELECT concepto, monto FROM percepciones WHERE id_nomina = %s"
         cursor.execute(query_percepciones, (id_nomina,))
-        percepciones = cursor.fetchall()
+        percepciones = filas_a_diccionario(cursor, cursor.fetchall())
 
         # Obtener deducciones asociadas a esta nómina
         query_deducciones = "SELECT concepto, monto FROM deducciones WHERE id_nomina = %s"
         cursor.execute(query_deducciones, (id_nomina,))
-        deducciones = cursor.fetchall()
+        deducciones = filas_a_diccionario(cursor, cursor.fetchall())
 
-        # Obtener incapacidades asociadas al empleado de esta nómina
+        # Obtener incapacidades asociadas al empleado
         query_incapacidades = """
             SELECT tipo, fecha_inicio, fecha_fin, dias_incapacidad
             FROM incapacidades
             WHERE id_empleado = (SELECT id_empleado FROM nominas WHERE id_nomina = %s)
         """
         cursor.execute(query_incapacidades, (id_nomina,))
-        incapacidades = cursor.fetchall()
+        incapacidades = filas_a_diccionario(cursor, cursor.fetchall())
 
         cursor.close()
 
-        # Añadir los datos del empleado al diccionario de la nómina
+        # Agregar datos del empleado
         if empleado:
             nomina['empleado'] = {
                 'nombre': empleado[0],
@@ -323,10 +398,10 @@ def obtener_detalle_nomina(id_nomina):
                 'puesto': empleado[2]
             }
 
-        # Añadir percepciones, deducciones e incapacidades al diccionario de la nómina
-        nomina['percepciones'] = [{'concepto': perc[0], 'monto': perc[1]} for perc in percepciones]
-        nomina['deducciones'] = [{'concepto': ded[0], 'monto': ded[1]} for ded in deducciones]
-        nomina['incapacidades'] = [{'tipo': incap[0], 'fecha_inicio': incap[1], 'fecha_fin': incap[2], 'dias_incapacidad': incap[3]} for incap in incapacidades]
+        # Asignar listas de diccionarios
+        nomina['percepciones'] = percepciones
+        nomina['deducciones'] = deducciones
+        nomina['incapacidades'] = incapacidades
 
         return nomina
     else:

@@ -102,4 +102,22 @@ function descargarPDF() {
     // Guardar el archivo
     doc.save('nomina.pdf');
 }
+function filtrarPorQuincena() {
+    var quincena = document.getElementById("quincenaSelect").value; // Obtener valor del select
+    var rows = document.querySelectorAll("#tablaNominas .nomina"); // Seleccionar todas las filas de la tabla
+
+    rows.forEach(function(row) {
+        var periodoInicio = row.getAttribute("data-periodo-inicio"); // Obtener la fecha de inicio del periodo
+        var fechaInicio = new Date(periodoInicio); // Convertir a un objeto Date para manipularla
+
+        var dia = fechaInicio.getDate(); // Obtener el día del mes
+
+        // Filtrar según la quincena seleccionada
+        if (quincena === "" || (quincena === "1" && dia <= 15) || (quincena === "2" && dia > 15)) {
+            row.style.display = "";
+        } else {
+            row.style.display = "none";
+        }
+    });
+}
 
