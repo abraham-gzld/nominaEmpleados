@@ -210,7 +210,7 @@ def generar_nomina():
             dias_incapacidad_total += dias_incapacidad_periodo
 
     # Calcular el sueldo diario
-    sueldo_diario = salario_base / 30  # Suponiendo que el mes tiene 30 días
+    sueldo_diario = salario_base / dias_incapacidad_total  # Suponiendo que el mes tiene 30 días
 
     # Calcular el descuento por incapacidad
     descuento_incapacidades = dias_incapacidad_total * sueldo_diario
