@@ -154,114 +154,110 @@ def nominas_por_quincena(quincena):
 
 @app.route("/generar_nomina", methods=["POST"])
 def generar_nomina():
-    conexion = obtener_conexion()
-    cursor = conexion.cursor()
+    from datetime import datetime
 
-    id_empleado = request.form['empleado']
-    periodo_inicio = datetime.strptime(request.form['periodo_inicio'], '%Y-%m-%d').date()
-    periodo_fin = datetime.strptime(request.form['periodo_fin'], '%Y-%m-%d').date()
+    try:
+        conexion = obtener_conexion()
+        cursor = conexion.cursor()
 
-    salario_base = float(request.form['salario_base'])
-    puntualidad = float(request.form['puntualidad'])
-    asistencia = float(request.form['asistencia'])
-    
-    imss = float(request.form['imss'])
-    isr = float(request.form['isr'])
-    cuota_sindical = float(request.form['cuota_sindical'])
-    fondo_retiro = float(request.form['fondo_retiro'])
-    infonavit = float(request.form['infonavit'])
-    caja_ahorro = float(request.form['caja_ahorro'])
+        # Obtener datos del formulario
+        id_empleado = request.form['empleado']
+        periodo_inicio = datetime.strptime(request.form['periodo_inicio'], '%Y-%m-%d').date()
+        periodo_fin = datetime.strptime(request.form['periodo_fin'], '%Y-%m-%d').date()
+        salario_base = float(request.form['salario_base'])
 
-    # Percepciones adicionales
-    percepciones_extra = request.form.getlist('percepcion_concepto[]')
-    montos_extra = request.form.getlist('percepcion_monto[]')
-    montos_extra_float = [float(m) for m in montos_extra]
+        # Validación de datos
+        if salario_base <= 0:
+            return "El salario base debe ser un número positivo.", 400
 
-    # Deducciones adicionales
-    deducciones_extra = request.form.getlist('deduccion_concepto[]')
-    montos_deducciones_extra = request.form.getlist('deduccion_monto[]')
-    montos_deducciones_extra_float = [float(m) for m in montos_deducciones_extra]
+        # Consultar incapacidades dentro del período
+        cursor.execute("""
+            SELECT tipo, fecha_inicio, fecha_fin, dias_incapacidad
+            FROM incapacidades
+            WHERE id_empleado = %s AND fecha_inicio <= %s AND fecha_fin >= %s
+        """, (id_empleado, periodo_fin, periodo_inicio))
 
-    # Consultar las incapacidades del empleado que caen dentro del período de la nómina
-    cursor.execute("""
-        SELECT fecha_inicio, fecha_fin, dias_incapacidad
-        FROM incapacidades
-        WHERE id_empleado = %s AND fecha_inicio <= %s AND fecha_fin >= %s
-    """, (id_empleado, periodo_fin, periodo_inicio))
+        incapacidades = cursor.fetchall()
 
-    incapacidades = cursor.fetchall()
+        dias_incapacidad_total = 0
+        for tipo, fecha_inicio, fecha_fin, _ in incapacidades:
+            if isinstance(fecha_inicio, str):
+                fecha_inicio = datetime.strptime(fecha_inicio, '%Y-%m-%d').date()
+            if isinstance(fecha_fin, str):
+                fecha_fin = datetime.strptime(fecha_fin, '%Y-%m-%d').date()
 
-    # Calcular los días de incapacidad dentro de este período
-    dias_incapacidad_total = 0
-    for fecha_inicio, fecha_fin, dias_incapacidad in incapacidades:
-        # Verificar si las fechas de incapacidad son objetos datetime.date o cadenas
-        if isinstance(fecha_inicio, str):
-            fecha_inicio = datetime.strptime(fecha_inicio, '%Y-%m-%d').date()
-        if isinstance(fecha_fin, str):
-            fecha_fin = datetime.strptime(fecha_fin, '%Y-%m-%d').date()
+            inicio_incapacidad = max(fecha_inicio, periodo_inicio)
+            fin_incapacidad = min(fecha_fin, periodo_fin)
 
-        # Calcular días de incapacidad en el período de la quincena
-        inicio_incapacidad = max(fecha_inicio, periodo_inicio)
-        fin_incapacidad = min(fecha_fin, periodo_fin)
+            if inicio_incapacidad <= fin_incapacidad:
+                dias_incapacidad_total += (fin_incapacidad - inicio_incapacidad).days + 1
 
-        # Calcular los días que la incapacidad aplica dentro del período
-        if inicio_incapacidad <= fin_incapacidad:
-            dias_incapacidad_periodo = (fin_incapacidad - inicio_incapacidad).days + 1
-            dias_incapacidad_total += dias_incapacidad_periodo
+        # Calcular días del período y sueldo diario
+        dias_periodo = (periodo_fin - periodo_inicio).days + 1
+        dias_trabajados = dias_periodo - dias_incapacidad_total
+        sueldo_diario = salario_base / dias_periodo
+        salario_base_real = sueldo_diario * dias_trabajados  # Sueldo base después de restar los días de incapacidad
 
-    # Calcular el sueldo diario
-    sueldo_diario = salario_base / dias_incapacidad_total  # Suponiendo que el mes tiene 30 días
+        # Calcular percepciones
+        puntualidad = 0.05 * salario_base_real
+        asistencia = 0.03 * salario_base_real
 
-    # Calcular el descuento por incapacidad
-    descuento_incapacidades = dias_incapacidad_total * sueldo_diario
+        # Calcular deducciones
+        imss = 0.085 * salario_base_real
+        isr = 0.10 * salario_base_real
+        cuota_sindical = 0.03 * salario_base_real
+        fondo_retiro = 0.03 * salario_base_real
+        infonavit = 0.30 * salario_base_real
+        caja_ahorro = 0.06 * salario_base_real
 
-    # Calcular totales incluyendo adicionales
-    total_percepciones = salario_base + puntualidad + asistencia + sum(montos_extra_float)
-    total_deducciones = imss + isr + cuota_sindical + fondo_retiro + infonavit + caja_ahorro + sum(montos_deducciones_extra_float) + descuento_incapacidades
-    total_neto = total_percepciones - total_deducciones
+        # Calcular totales
+        total_percepciones = salario_base_real + puntualidad + asistencia
+        total_deducciones = imss + isr + cuota_sindical + fondo_retiro + infonavit + caja_ahorro
+        total_neto = total_percepciones - total_deducciones
 
-    # Insertar en la tabla 'nominas'
-    sql_nomina = """INSERT INTO nominas 
-        (id_empleado, fecha_emision, periodo_inicio, periodo_fin, total_percepciones, total_deducciones, total_neto) 
-        VALUES (%s, NOW(), %s, %s, %s, %s, %s)"""
-    cursor.execute(sql_nomina, (id_empleado, periodo_inicio, periodo_fin, total_percepciones, total_deducciones, total_neto))
-    conexion.commit()
+        # Insertar en la tabla 'nominas'
+        sql_nomina = """INSERT INTO nominas 
+            (id_empleado, fecha_emision, periodo_inicio, periodo_fin, total_percepciones, total_deducciones, total_neto) 
+            VALUES (%s, NOW(), %s, %s, %s, %s, %s)"""
+        cursor.execute(sql_nomina, (id_empleado, periodo_inicio, periodo_fin, total_percepciones, total_deducciones, total_neto))
+        conexion.commit()
 
-    id_nomina = cursor.lastrowid  # Obtener el ID de la nómina generada
+        id_nomina = cursor.lastrowid
 
-    # Guardar percepciones fijas
-    percepciones = [
-        ("Sueldo Base", salario_base),
-        ("Puntualidad", puntualidad),
-        ("Asistencia", asistencia)
-    ]
-    cursor.executemany("INSERT INTO percepciones (id_nomina, concepto, monto) VALUES (%s, %s, %s)", [(id_nomina, c, m) for c, m in percepciones])
+        # Percepciones
+        percepciones = [
+            ("Sueldo Base", salario_base_real),
+            ("Puntualidad", puntualidad),
+            ("Asistencia", asistencia)
+        ]
+        cursor.executemany("INSERT INTO percepciones (id_nomina, concepto, monto) VALUES (%s, %s, %s)", [(id_nomina, c, m) for c, m in percepciones])
 
-    # Guardar deducciones fijas
-    deducciones = [
-        ("ISR", isr),
-        ("IMSS", imss),
-        ("Cuota Sindical", cuota_sindical),
-        ("Fondo Retiro", fondo_retiro),
-        ("INFONAVIT", infonavit),
-        ("Caja de Ahorro", caja_ahorro),
-        ("Incapacidad", descuento_incapacidades)  # Insertar la deducción por incapacidad
-    ]
-    cursor.executemany("INSERT INTO deducciones (id_nomina, concepto, monto) VALUES (%s, %s, %s)", [(id_nomina, c, m) for c, m in deducciones])
+        # Deducciones
+        deducciones = [
+            ("ISR", isr),
+            ("IMSS", imss),
+            ("Cuota Sindical", cuota_sindical),
+            ("Fondo Retiro", fondo_retiro),
+            ("INFONAVIT", infonavit),
+            ("Caja de Ahorro", caja_ahorro)
+        ]
+        cursor.executemany("INSERT INTO deducciones (id_nomina, concepto, monto) VALUES (%s, %s, %s)", [(id_nomina, c, m) for c, m in deducciones])
 
-    # Guardar percepciones adicionales agregadas por el usuario
-    for concepto, monto in zip(percepciones_extra, montos_extra):
-        cursor.execute("INSERT INTO percepciones (id_nomina, concepto, monto) VALUES (%s, %s, %s)", (id_nomina, concepto, float(monto)))
+        # Confirmar cambios en la base de datos
+        conexion.commit()
 
-    # Guardar deducciones adicionales agregadas por el usuario
-    for concepto, monto in zip(deducciones_extra, montos_deducciones_extra):
-        cursor.execute("INSERT INTO deducciones (id_nomina, concepto, monto) VALUES (%s, %s, %s)", (id_nomina, concepto, float(monto)))
+    except Exception as e:
+        # Manejo de errores
+        print(f"Error al generar nómina: {e}")
+        return "Ocurrió un error al generar la nómina.", 500
 
-    conexion.commit()
-    cursor.close()
-    conexion.close()
+    finally:
+        # Cerrar cursor y conexión
+        cursor.close()
+        conexion.close()
 
     return redirect(url_for('nominas'))
+
 
 
 @app.route('/consultar_nominas', methods=['GET'])
