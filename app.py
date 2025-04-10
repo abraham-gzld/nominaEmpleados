@@ -199,16 +199,16 @@ def generar_nomina():
         salario_base_real = sueldo_diario * dias_trabajados  # Sueldo base después de restar los días de incapacidad
 
         # Calcular percepciones
-        puntualidad = 0.05 * salario_base_real
-        asistencia = 0.03 * salario_base_real
+        puntualidad = 0.05 * salario_base_real  # 5% de la percepción por puntualidad
+        asistencia = 0.03 * salario_base_real  # 3% de la percepción por asistencia
 
         # Calcular deducciones
-        imss = 0.085 * salario_base_real
-        isr = 0.10 * salario_base_real
-        cuota_sindical = 0.03 * salario_base_real
-        fondo_retiro = 0.03 * salario_base_real
-        infonavit = 0.30 * salario_base_real
-        caja_ahorro = 0.06 * salario_base_real
+        imss = 0.085 * salario_base_real  # Deducción de IMSS (8.5%)
+        isr = 0.10 * salario_base_real  # Deducción de ISR (10%)
+        cuota_sindical = 0.03 * salario_base_real  # Deducción de cuota sindical (3%)
+        fondo_retiro = 0.03 * salario_base_real  # Deducción de fondo de retiro (3%)
+        infonavit = 0.30 * salario_base_real  # Deducción de INFONAVIT (30%)
+        caja_ahorro = 0.06 * salario_base_real  # Deducción de caja de ahorro (6%)
 
         # Calcular totales
         total_percepciones = salario_base_real + puntualidad + asistencia
@@ -257,6 +257,7 @@ def generar_nomina():
         conexion.close()
 
     return redirect(url_for('nominas'))
+
 
 
 
