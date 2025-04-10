@@ -45,63 +45,85 @@ function verDetalle(idNomina) {
         $('#detalleNominaModal').modal('show');
     });
 }
-
 function descargarPDF() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
 
-    // Asegúrate de que los datos estén disponibles
     if (!datosNomina || !datosNomina.empleado) {
         alert("No se pudieron cargar los detalles de la nómina.");
         return;
     }
 
-    // Título
+    const salario_base_real = parseFloat(
+        datosNomina.percepciones.find(p => p.concepto === "Sueldo Base")?.monto || 0
+    );
+
     doc.setFontSize(20);
     doc.text("Nómina de Pago", 105, 20, null, null, 'center');
     doc.setFontSize(12);
 
-    // Información del empleado
     doc.text(`Empleado: ${datosNomina.empleado.nombre} ${datosNomina.empleado.apellido}`, 20, 40);
     doc.text(`Puesto: ${datosNomina.empleado.puesto}`, 20, 50);
     doc.text(`Fecha de Emisión: ${datosNomina.fecha_emision}`, 20, 60);
     doc.text(`Periodo: ${datosNomina.periodo_inicio} al ${datosNomina.periodo_fin}`, 20, 70);
 
-    // Agregar tabla con percepciones
-    let y = 90;  // Y de la primera línea para percepciones
+    // Tabla de percepciones
+    let y = 90;
     doc.text("Percepciones:", 20, y);
-    y += 10;  // Espacio para la tabla de percepciones
+    y += 10;
+
+    const percepcionesConPorcentaje = datosNomina.percepciones.map(p => {
+        let porcentaje = '';
+        if (p.concepto === "Puntualidad") porcentaje = " (5%)";
+        if (p.concepto === "Asistencia") porcentaje = " (3%)";
+        return [`${p.concepto}${porcentaje}`, `$${parseFloat(p.monto).toFixed(2)}`];
+    });
+
     doc.autoTable({
         startY: y,
         head: [['Concepto', 'Monto']],
-        body: datosNomina.percepciones.map(p => [p.concepto, `$${p.monto}`]),  // Asegúrate de que este campo esté en el formato correcto
+        body: percepcionesConPorcentaje,
         theme: 'grid',
         headStyles: { fillColor: [22, 160, 133] },
         styles: { fontSize: 10 },
     });
 
-    // Agregar deducciones
-    y += 40;  // Espacio para deducciones
+    // Tabla de deducciones
+    y = doc.lastAutoTable.finalY + 10;
     doc.text("Deducciones:", 20, y);
     y += 10;
+
+    const deduccionesConPorcentaje = datosNomina.deducciones.map(d => {
+        let porcentaje = '';
+        switch (d.concepto) {
+            case "IMSS": porcentaje = " (8.5%)"; break;
+            case "ISR": porcentaje = " (10%)"; break;
+            case "Cuota Sindical": porcentaje = " (3%)"; break;
+            case "Fondo Retiro": porcentaje = " (3%)"; break;
+            case "INFONAVIT": porcentaje = " (30%)"; break;
+            case "Caja de Ahorro": porcentaje = " (6%)"; break;
+        }
+        return [`${d.concepto}${porcentaje}`, `$${parseFloat(d.monto).toFixed(2)}`];
+    });
+
     doc.autoTable({
         startY: y,
         head: [['Concepto', 'Monto']],
-        body: datosNomina.deducciones.map(d => [d.concepto, `$${d.monto}`]),  // Asegúrate de que este campo esté en el formato correcto
+        body: deduccionesConPorcentaje,
         theme: 'grid',
         headStyles: { fillColor: [242, 85, 96] },
         styles: { fontSize: 10 },
     });
 
-    // Agregar Totales
-    y += 60;  // Espacio para el total
+    // Totales
+    y = doc.lastAutoTable.finalY + 10;
     doc.text(`Total Percepciones: $${datosNomina.total_percepciones}`, 20, y);
     doc.text(`Total Deducciones: $${datosNomina.total_deducciones}`, 20, y + 10);
     doc.text(`Total Neto: $${datosNomina.total_neto}`, 20, y + 20);
 
-    // Guardar el archivo
     doc.save('nomina.pdf');
 }
+
 function filtrarPorQuincena() {
     var quincena = document.getElementById("quincenaSelect").value; // Obtener valor del select
     var rows = document.querySelectorAll("#tablaNominas .nomina"); // Seleccionar todas las filas de la tabla
